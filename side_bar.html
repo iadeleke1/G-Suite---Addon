@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+</head>
+<style>
+#slack_channels {
+background-image: url('/css/searchicon.png');
+background-position: 10px 10px;
+background-repeat: no-repeat;
+width: 40%;
+font-size: 14px;
+padding: 12px 20px 12px 40px;
+border: 1px solid #ddd;
+margin-bottom: 12px;
+}
+#submit{
+width: 40%;
+font-size: 14px;
+background-position: 10px 10px;
+}
+#channels{
+width: 200px;
+height: 25px;
+padding-right: 50px;
+}
+#add_button_slack{
+height: 30px;
+width: 100px;
+background: blue;
+color: white;
+border: 0;
+-webkit-appearance: none;
+}
+#add_button_email{
+height: 30px;
+width: 100px;
+background: blue;
+color: white;
+border: 0;
+-webkit-appearance: none;
+}
+#emails{
+width: 200px;
+height: 25px;
+padding-right: 50px;
+}
+
+</style>
+<body onload="loadResponses()">
+<h3>Settings for G Forms Response Alerts</h3>
+<p>Fields to report and their priority</p>
+<div>
+<ul id="questions_list"></ul>
+</div>
+
+
+<form id="slack_form">
+Slack: <input type="checkbox" id="slack_check"  onclick="slackFunction()">
+
+<div id="slack_div">
+
+<p style="display:none; font-size:14px" id="slack_selected">Enter the Slack Channel Name and Click Add Channel</p>
+<label id="slack_label"for="lname" style="display:none; font-size:14px;">Slack Channel:</label>
+<input style="display:none;" type="text" id="channels" name="channels" size="50">
+<input style="display:none;" id="add_button_slack" type="submit" value="Add Channel..." onclick="add_to_slack_list()">
+<p style="display:none; font-size:14px" id="current_message_slack">Here are the channels that are receiving Slack notifications from this form</p>
+<ul style="display:none; " name="slack_list" id="slack_list"></ul>
+</div>
+
+<div id="email_div">
+
+Email: <input type="checkbox" id="email_check"  onclick="emailFunction()">
+<p style="display:none; font-size:14px" id="email_selected">Enter email address and click add Email</p>
+<label id="email_label" for="lname" style="display:none;">Email address:</label>
+<input style="display:none;" type="text" id="emails" name="emails" size="50">
+<input style="display:none;" id="add_button_email" type="submit" value="Add Email..." onclick="add_to_email_list()">
+<p style="display:none; font-size:14px" id="current_message_email">Here are the emails receiving notifications from this form</p>
+<ul style="display:none; " id="email_list"></ul>
+</div>
+
+<button onclick="submitForm(this)" type="submit" class="btn btn-primary btn-block">Submit</button>
+</form>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+<script >
+window.addEventListener('load', preventFormSubmit);
+
+function loadResponses(){
+//Load Emails getting notified
+google.script.run.verifySheets();
+
+var onSucess = function(questions){
+//console.log('run Onsuccess');
+var questions_list = document.getElementById("questions_list");
+
+if (questions !== null){
+  questions_list.innerHTML = '';
+  for (var i = 0; i < questions.length; i++){
+    add_responses_questions(questions[i])
+  }
+}
+slackFunction();
+emailFunction();
+
+}
+//Get list emails that are set to receive alerts
+google.script.run.withSuccessHandler(onSucess).getReportOrder();
+}
+
+var el;
+
+function dragOver(e){
+  if (isBefore(el, e.target))
+    e.target.parentNode.insertBefore(el, e.target);
+  else
+    e.target.parentNode.insertBefore(el, e.target.nextSibling);
+}
+function dragStart(e){
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", null); // Thanks to bqlou for their comment.
+  el = e.target;
+}
+
+function isBefore(el1, el2) {
+  if (el2.parentNode === el1.parentNode)
+    for (var cur = el1.previousSibling; cur && cur.nodeType !== 9; cur = cur.previousSibling)
+      if (cur === el2)
+        return true;
+  return false;
+}
+
+//Function add to email list
+function add_to_email_list(){
+var email_list = document.getElementById("email_list");
+var input = document.getElementById("emails");
+if (input.value != ""){
+var li = document.createElement("li");
+var remove_button = document.createElement("input");
+remove_button.type = "button";
+remove_button.value = "remove";
+remove_button.setAttribute("onclick","remove_email()");
+
+li.setAttribute('id',input.value);
+li.appendChild(document.createTextNode(input.value));
+li.appendChild(remove_button);
+email_list.appendChild(li);
+input.value = "";
+}
+else{
+alert("please enter an email address");
+}
+
+}
+
+//remove email from list
+function remove_email(){
+var email_list = document.getElementById("email_list");
+var input = document.getElementById("emails");
+var item = document.getElementById(input.value);
+email_list.removeChild(item);
+}
+function remove_slack_channel2(id){
+var slack_list = document.getElementById("slack_list");
+var input = document.getElementById(id);
+slack_list.removeChild(input);
+}
+function remove_email2(id){
+var email_list = document.getElementById("email_list");
+var input = document.getElementById(id);
+email_list.removeChild(input);
+}
+
+//Function to remove Slack Channel from the list
+function remove_slack_channel(){
+var slack_list = document.getElementById("slack_list");
+var input = document.getElementById("channels");
+var item = document.getElementById(input.value);
+//google.script.run.removeChannel(input.value);
+
+slack_list.removeChild(item);
+}
+
+function add_responses_questions(questions){
+var questions_list = document.getElementById("questions_list");
+var li = document.createElement("li");
+
+li.setAttribute('id',questions);
+li.appendChild(document.createTextNode(questions));
+li.setAttribute('draggable',"true");
+li.setAttribute('ondragover',"dragOver(event)");
+li.setAttribute('ondragstart',"dragStart(event)");
+questions_list.appendChild(li);
+}
+
+function add_channels_from_spreadsheet(channel_name){
+var slack_list = document.getElementById("slack_list");
+var li = document.createElement("li");
+
+//add remove button to each list
+var remove_button = document.createElement("input");
+remove_button.type = "button";
+remove_button.value = "remove";
+remove_button.setAttribute("onclick","remove_slack_channel2(id)");
+remove_button.setAttribute('id',channel_name);
+
+li.setAttribute('id',channel_name);
+//li.setAttribute('draggable',"true");
+//li.setAttribute('ondragover',"dragOver(event)");
+//li.setAttribute('ondragstart',"dragStart(event)");
+li.appendChild(document.createTextNode(channel_name));
+li.appendChild(remove_button);
+slack_list.appendChild(li);
+}
+
+function add_emails_from_spreadsheet(emails){
+var email_list = document.getElementById("email_list");
+var li = document.createElement("li");
+
+//add remove button to each list
+var remove_button = document.createElement("input");
+remove_button.type = "button";
+remove_button.value = "remove";
+remove_button.setAttribute("onclick","remove_email2(id)");
+remove_button.setAttribute('id',emails);
+
+li.setAttribute('id',emails);
+//li.setAttribute('draggable',"true");
+//li.setAttribute('ondragover',"dragOver(event)");
+//li.setAttribute('ondragstart',"dragStart(event)");
+li.appendChild(document.createTextNode(emails));
+li.appendChild(remove_button);
+email_list.appendChild(li);
+}
+
+//function add to Slack list
+function add_to_slack_list(){
+var slack_list = document.getElementById("slack_list");
+var input = document.getElementById("channels");
+
+if (input.value != ""){
+var li = document.createElement("li");
+
+//add remove button to each list
+var remove_button = document.createElement("input");
+remove_button.type = "button";
+remove_button.value = "remove";
+remove_button.setAttribute("onclick","remove_slack_channel()");
+
+li.setAttribute('id',input.value);
+//li.setAttribute('draggable',"true");
+//li.setAttribute('ondragover',"dragOver(event)");
+//li.setAttribute('ondragstart',"dragStart(event)");
+li.appendChild(document.createTextNode(input.value));
+li.appendChild(remove_button);
+slack_list.appendChild(li);
+input.value = "";
+}
+else{
+alert("please enter a channel name");
+}
+
+}
+
+//prevent forms from submitting
+//Needed to disable the redirect from submitting a form
+function preventFormSubmit(){
+var forms = document.querySelectorAll('form');
+for (var i = 0; i < forms.length; i++) {
+forms[i].addEventListener('submit', function(event) {
+event.preventDefault();
+});
+}
+}
+
+//This funtion does all the action on Submit
+function submitForm(formObject){
+var slack_list = document.getElementById("slack_list");
+var email_list = document.getElementById("email_list");
+var questions_list = document.getElementById("questions_list");
+
+var slack_channels = slack_list.getElementsByTagName("li");
+var emails_li = email_list.getElementsByTagName("li");
+var questions_order = questions_list.getElementsByTagName("li");
+var channels = [];
+var emails = [];
+var questions = []
+
+for (var i = 0; i < slack_channels.length; i++){
+  channels[i] = (slack_channels[i].textContent);
+}
+for (var i = 0; i < emails_li.length; i++){
+  emails[i] = (emails_li[i].textContent);
+}
+for (var i = 0; i < questions_order.length; i++){
+  questions[i] = (questions_order[i].textContent);
+}
+
+google.script.run.updateChannels(channels);
+google.script.run.updateEmails(emails);
+google.script.run.updateQuestions(questions);
+google.script.run.closeSidebar();
+}
+
+//This Function is triggered by the Slack Check box
+//It list the current channels that are receiving notifications
+//This function controls the display of Slack section
+function slackFunction() {
+var checkBox = document.getElementById("slack_check");
+var selected = document.getElementById("slack_selected");
+var selected_label = document.getElementById("slack_label");
+var channels = document.getElementById("channels");
+var current_message = document.getElementById("current_message_slack");
+var slack_add_button = document.getElementById("add_button_slack");
+var slack_list = document.getElementById("slack_list");
+
+var onSucess = function(channels){
+if (channels !== null){
+  slack_list.innerHTML = '';
+  while(channels.length != 0){
+    var channel = (channels.pop());
+    add_channels_from_spreadsheet(channel);
+  }
+}
+}
+//Get list Slack channels that are set to receive alerts
+google.script.run.withSuccessHandler(onSucess).getSlackList();
+
+if (checkBox.checked == true){
+//text.style.display = "block";
+//This function loads the list of Slack channels that are already receiving alerts
+
+
+selected.style.display = "block";
+channels.style.display = "block";
+selected_label.style.display = "block";
+slack_add_button.style.display = "block";
+current_message.style.display = "block";
+slack_list.style.display = "block";
+
+} else {
+selected.style.display = "none";
+slack_list.style.display = "none";
+selected_label.style.display = "none";
+slack_add_button.style.display = "none";
+current_message.style.display = "none";
+channels.style.display = "none";
+}
+}
+//This Function is triggered by the Email Check box
+//It list the current channels that are receiving notifications
+//This function controls the display of Email section
+function emailFunction() {
+var checkBox = document.getElementById("email_check");
+var selected = document.getElementById("email_selected");
+var selected_label = document.getElementById("email_label");
+var email_list = document.getElementById("emails");
+
+var checkBox = document.getElementById("email_check");
+var selected = document.getElementById("email_selected");
+var selected_label = document.getElementById("email_label");
+var emails = document.getElementById("emails");
+var current_message = document.getElementById("current_message_email");
+var email_add_button = document.getElementById("add_button_email");
+var email_list = document.getElementById("email_list");
+
+//Load Emails getting notified
+var onSucess = function(emails){
+//console.log('run Onsuccess');
+if (emails !== null){
+  email_list.innerHTML = '';
+  while(emails.length != 0){
+    var email = (emails.pop());
+    add_emails_from_spreadsheet(email);
+  }
+}
+
+}
+//Get list emails that are set to receive alerts
+google.script.run.withSuccessHandler(onSucess).getEmailList();
+
+//When the Email checkbox is clicked
+if (checkBox.checked == true){
+
+selected.style.display = "block";
+emails.style.display = "block";
+selected_label.style.display = "block";
+email_add_button.style.display = "block";
+current_message.style.display = "block";
+email_list.style.display = "block";
+}
+else {
+selected.style.display = "none";
+emails.style.display = "none";
+selected_label.style.display = "none";
+email_add_button.style.display = "none";
+current_message.style.display = "none";
+email_list.style.display = "none";
+}
+}
+</script>
+
+</body>
+</html>
